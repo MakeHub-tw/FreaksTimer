@@ -1,6 +1,6 @@
 # FreaksTimer
 
-Do you like to build your own promodoro timer ? ElecFreaks has built a great programmable Arduino (Leonardo compatible w/ ATmega32U4) device sold here: [FreaksTimer](http://www.elecfreaks.com/estore/freakstimer.html), and we at MakeHub Taiwan tries to make it better by rewriting the firmware sketches.
+Do you like to build your own pomodoro timer ? ElecFreaks has built a great but cheap programmable Arduino (Leonardo compatible w/ ATmega32U4) device sold here: [FreaksTimer](http://www.elecfreaks.com/estore/freakstimer.html), and we at MakeHub Taiwan tries to make it better by rewriting the firmware sketches.
 
 - sketch_dec07a -- This is the original firmware sketch comes with the device. You must compile it with the specific r11 version of TimerOne library. (could be downloaded here: https://code.google.com/archive/p/arduino-timerone/downloads)
 
