@@ -4,7 +4,7 @@ Do you like to build your own pomodoro timer ? ElecFreaks has built a great but 
 
 Currently there are two sketches:
 
-- PromodoroTimer -- MakeHub completely rewrote the whole firwmare sketch. Now it's shorter and clear, easy for further improvements. And now it's perfect to be a pomodoro timer used with the [Pomodoro Technique](http://pomodorotechnique.com).
+- PromodoroTimer -- MakeHub completely rewrote the whole firwmare sketch. The code is shorter, more clear, and easier for further improvements. And we think it's perfect to be used as a pomodoro timer with the [Pomodoro Technique](http://pomodorotechnique.com).
 
 - sketch_dec07a -- The original firmware sketch comes with the device. You must compile it with the specific r11 version of TimerOne library. (could be downloaded here: https://code.google.com/archive/p/arduino-timerone/downloads)
 
