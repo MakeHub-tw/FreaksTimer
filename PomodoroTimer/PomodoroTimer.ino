@@ -278,7 +278,7 @@ void loop()
 #ifdef BASE_16
   displayDigit(1, minutes / 16);
 #else
-  displayDigit(1, minutes / 16);
+  displayDigit(1, minutes / 10);
 #endif
   delay(1);
 }
