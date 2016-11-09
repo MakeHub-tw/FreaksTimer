@@ -1,5 +1,7 @@
-//#define DEBUG
 #include <TimerOne.h>
+
+//#define DEBUG
+#define BASE_16
 
 // input definitions
 #define encoderPinA  0
@@ -9,15 +11,16 @@
 
 // totally 8 LEDs of the ring
 const byte LEDs[] = {
-  A5, A4, A3, A2, A1, A0, SCK, 17
+  17, A5, A4, A3, A2, A1, A0, SCK
 };
 
 // index to light the only one LED
 byte indexLED = 0;
 
+volatile byte seconds = 0;
 // minutes to count down
-byte minutes = 0;
-byte lastSetMinutes = 0;
+volatile int  minutes = 0;
+int lastSetMinutes = 0;
 
 // system modes
 enum systemMode {
@@ -31,8 +34,9 @@ volatile systemMode mode = STANDBY;
 void lightNumber(byte num) {
   // PIN 9, 8, 7, 6, 5, 4, 3, 2 map to 8 binary digits
   static const byte numbers[] = {
-    B00111111, B00000110, B01011011, B01001111, B01100110,
-    B01101101, B01111101, B00000111, B01111111, B01101111
+    B00111111, B00000110, B01011011, B01001111, B01100110,  // 0 ~ 4
+    B01101101, B01111101, B00000111, B01111111, B01101111,  // 5 ~ 9
+    B01110111, B01111100, B00111001, B01011110, B01111001, B01110001  // A ~ F
   };
 
   byte number = numbers[num];
@@ -61,21 +65,14 @@ void displayDigit(byte digit, byte num) {
   lightNumber(num);
 }
 
-// limit the minimal minutes
-void decreaseMinutes() {
-  if (minutes > 0)
-    minutes--;
-}
-
-// limit the maximal minutes
-void increaseMinutes() {
-  if (minutes < 99)
-    minutes++;
-}
-
 void writeLEDs(byte state) {
-  for (unsigned char i = 0; i < sizeof(LEDs); i++)
+  for (byte i = 0; i < sizeof(LEDs); i++)
     digitalWrite(LEDs[i], state);
+}
+
+void onlyLED() {
+  writeLEDs(LOW);
+  digitalWrite(LEDs[indexLED], HIGH);
 }
 
 void onlyPrevLED() {
@@ -90,57 +87,109 @@ void onlyNextLED() {
   digitalWrite(LEDs[indexLED], HIGH);  
 }
 
-void onlyLED(byte num) {
-  writeLEDs(LOW);
-  digitalWrite(LEDs[num], HIGH);
+// limit the minimal minutes
+void decreaseMinutes() {
+  if (minutes > 0) {
+    minutes--;
+    seconds = 0;
+    lastSetMinutes = minutes;
+    onlyPrevLED();
+  }
+}
+
+// limit the maximal minutes
+void increaseMinutes() {
+#ifdef BASE_16
+  if (minutes < 255) {
+#else
+  if (minutes < 99) {
+#endif
+    minutes++;
+    seconds = 0;
+    lastSetMinutes = minutes;
+    onlyNextLED();
+  }
 }
 
 void doCounting() {
-  static byte ticks;
+  static byte ticks = 0;
 
-//  if (mode != COUNTING) return;
+  if (mode == COUNTING) {
+    switch (ticks++) {
+      case 0 :
+        analogWrite(buzzerPin, 2);  // start small ticktock
+        break;
+      case 1 :
+        analogWrite(buzzerPin, 0);  // stop ticktock
+        break;
+      case 19 :
+        ticks = 0;      // divided by 20
+        onlyPrevLED();
+        if (seconds++ == 59) {
+          seconds = 0;  // divided by 60
+          minutes--;  // decrease minutes
+        }
+    }
 
-  switch (ticks++) {
-    case 0:
-      analogWrite(buzzerPin, 2);
-      break;
-    case 1:
+    if (minutes == 0) {
+      mode = ALERTING;
+    }
+  } else if (mode == ALERTING) {
+    ticks++;
+
+    if (ticks % 2) {
+      analogWrite(buzzerPin, 255);
+      writeLEDs(HIGH);
+    } else {
       analogWrite(buzzerPin, 0);
-      break;
-    case 10:
-      onlyPrevLED();
-      ticks = 0;
+      writeLEDs(LOW);
+    }
+
+    if (ticks == 20) {
+      ticks = 0;      // divided by 20
+      if (seconds++ == 59) {
+        seconds = 0;  // divided by 60
+        minutes--;    // decrease minutes
+      }
+    }
+
+    if (minutes < 0) {
+      minutes = lastSetMinutes;
+      mode = STANDBY;
+    }
   }
 }
 
 void doEncoder() {
   if (mode == STANDBY) {
-    if (digitalRead(encoderPinA) == digitalRead(encoderPinB))
+    if (digitalRead(encoderPinA) == digitalRead(encoderPinB)) {
       decreaseMinutes();
-    else
+    } else {
       increaseMinutes();
+    }
   }
 }
 
 void setup()
 {
-  pinMode(13, OUTPUT);
-  pinMode(12, OUTPUT);
-    
-  pinMode(2, OUTPUT); 
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(7, OUTPUT);
-  pinMode(8, OUTPUT);
-  pinMode(9, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);
 
   for (byte i = 0; i < sizeof(LEDs); i++)  {
     pinMode(LEDs[i], OUTPUT);
   }
 
-  pinMode(buzzerPin, OUTPUT);
+  pinMode(13, OUTPUT);  // digit 1
+  pinMode(12, OUTPUT);  // digit 0
+    
+  pinMode(2, OUTPUT);   // a
+  pinMode(3, OUTPUT);   // b
+  pinMode(4, OUTPUT);   // c
+  pinMode(5, OUTPUT);   // d
+  pinMode(6, OUTPUT);   // e
+  pinMode(7, OUTPUT);   // f
+  pinMode(8, OUTPUT);   // g
+  pinMode(9, OUTPUT);   // p
 
   pinMode(buttonPin,   INPUT_PULLUP);
   pinMode(encoderPinA, INPUT_PULLUP);
@@ -148,7 +197,7 @@ void setup()
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoder, FALLING);
 
-  Timer1.initialize(100000);
+  Timer1.initialize(50000);           // 0.05 second per tick
   Timer1.attachInterrupt(doCounting);
 
 #ifdef DEBUG
@@ -159,6 +208,8 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB, on LEONARDO, MICRO, YUN, and other 32u4 based boards.
   }
 #endif
+
+  // Leonardo would write pin 17 HIGH after setup by itself
 }
 
 void loop()
@@ -193,17 +244,20 @@ void loop()
       if (buttonState == LOW) {
         switch (mode) {
           case STANDBY:
-            lastSetMinutes = minutes;
             mode = COUNTING;
+            writeLEDs(HIGH);
             break;
       
           case COUNTING:
             mode = STANDBY;
+            writeLEDs(HIGH);
             break;
       
           case ALERTING:
-            minutes = lastSetMinutes;
             mode = STANDBY;
+            digitalWrite(buzzerPin, LOW);
+            writeLEDs(LOW);
+            minutes = lastSetMinutes;
             break;
         }
       }
@@ -215,9 +269,17 @@ void loop()
   lastButtonState = reading;
 
   // house keeping the nixie tube
+#ifdef BASE_16
+  displayDigit(0, minutes % 16);
+#else
   displayDigit(0, minutes % 10);
+#endif
   delay(1);
-  displayDigit(1, minutes / 10);
+#ifdef BASE_16
+  displayDigit(1, minutes / 16);
+#else
+  displayDigit(1, minutes / 16);
+#endif
   delay(1);
 }
 
