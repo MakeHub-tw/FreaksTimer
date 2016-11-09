@@ -1,7 +1,7 @@
 #include <TimerOne.h>
 
 //#define DEBUG
-#define BASE_16
+//#define BASE_16
 
 // input definitions
 #define encoderPinA  0
