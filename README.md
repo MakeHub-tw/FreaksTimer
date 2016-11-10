@@ -18,4 +18,4 @@ Currently there are two sketches:
 
 - Supports Base-16 to count down up to 255 minutes (enable BASE_16 definition then recompile).
 
-- Remember the last setting of minutes to count down. (Pause in the counting down process WON'T affect it except for encoder events)
+- Remembers the last setting of minutes to count down.
