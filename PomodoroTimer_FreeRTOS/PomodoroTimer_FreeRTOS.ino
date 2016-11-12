@@ -1,3 +1,7 @@
+#include <util/atomic.h>
+#include <avr/sleep.h>
+
+#include <Arduino_FreeRTOS.h>
 #include <TimerOne.h>
 
 //#define DEBUG
@@ -171,6 +175,71 @@ void doEncoder() {
   }
 }
 
+
+void TaskButton( void *pvParameters )
+{
+  (void) pvParameters;
+
+  static byte lastButtonState = HIGH;
+  static byte buttonState;                    // the current reading from the input pin
+
+  static unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+  static unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
+
+  for (;;) // A Task shall never return or exit.
+  {
+    int reading = digitalRead(buttonPin);
+
+    // check to see if you just pressed the button
+    // (i.e. the input went from LOW to HIGH),  and you've waited
+    // long enough since the last press to ignore any noise:
+
+    // If the switch changed, due to noise or pressing:
+    if (reading != lastButtonState) {
+      // reset the debouncing timer
+      lastDebounceTime = millis();
+    }
+
+    if ((millis() - lastDebounceTime) > debounceDelay) {
+      // whatever the reading is at, it's been there for longer
+      // than the debounce delay, so take it as the actual current state:
+
+      // if the button state has changed:
+      if (reading != buttonState) {
+        buttonState = reading;
+
+        // only toggle the LED if the new button state is LOW
+        if (buttonState == LOW) {
+          switch (mode) {
+            case STANDBY:
+              mode = COUNTING;
+              writeLEDs(HIGH);
+              break;
+
+            case COUNTING:
+              mode = STANDBY;
+              writeLEDs(HIGH);
+              break;
+
+            case ALERTING:
+              mode = STANDBY;
+              digitalWrite(buzzerPin, LOW);
+              writeLEDs(LOW);
+              minutes = lastSetMinutes;
+              break;
+          }
+        }
+      }
+    }
+
+    // save the reading.  Next time through the loop,
+    // it'll be the lastButtonState:
+    lastButtonState = reading;
+
+    vTaskDelay( 1 );
+  }
+}
+
 void setup()
 {
   pinMode(buzzerPin, OUTPUT);
@@ -201,6 +270,14 @@ void setup()
   Timer1.initialize(50000);           // 0.05 second per tick
   Timer1.attachInterrupt(doCounting);
 
+  xTaskCreate(
+    TaskButton
+    ,  (const portCHAR *)"Button"     // A name just for humans
+    ,  128  // This stack size can be checked & adjusted by reading the Stack Highwater
+    ,  NULL
+    ,  2  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+    ,  NULL );
+
 #ifdef DEBUG
   // initialize serial communication at 9600 bits per second:
   Serial.begin(9600);
@@ -215,60 +292,6 @@ void setup()
 
 void loop()
 {
-  static byte lastButtonState = HIGH;
-  static byte buttonState;                    // the current reading from the input pin
-
-  static unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-  static unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
- 
-  int reading = digitalRead(buttonPin);
-
-  // check to see if you just pressed the button
-  // (i.e. the input went from LOW to HIGH),  and you've waited
-  // long enough since the last press to ignore any noise:
-
-  // If the switch changed, due to noise or pressing:
-  if (reading != lastButtonState) {
-    // reset the debouncing timer
-    lastDebounceTime = millis();
-  }
-
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    // whatever the reading is at, it's been there for longer
-    // than the debounce delay, so take it as the actual current state:
-
-    // if the button state has changed:
-    if (reading != buttonState) {
-      buttonState = reading;
-
-      // only toggle the LED if the new button state is LOW
-      if (buttonState == LOW) {
-        switch (mode) {
-          case STANDBY:
-            mode = COUNTING;
-            writeLEDs(HIGH);
-            break;
-      
-          case COUNTING:
-            mode = STANDBY;
-            writeLEDs(HIGH);
-            break;
-      
-          case ALERTING:
-            mode = STANDBY;
-            digitalWrite(buzzerPin, LOW);
-            writeLEDs(LOW);
-            minutes = lastSetMinutes;
-            break;
-        }
-      }
-    }
-  }
-
-  // save the reading.  Next time through the loop,
-  // it'll be the lastButtonState:
-  lastButtonState = reading;
-
   // housekeeping of the nixie tube
 #ifdef BASE_16
   displayDigit(0, minutes % 16);
